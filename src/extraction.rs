@@ -5,7 +5,7 @@ pub trait ProtocolState : Clone {
     type ProverMessage;
     type VerifierMessage;
 
-    fn new(instance: Self::Instance, witness: Self::Witness) -> Self;
+    fn new(instance: &Self::Instance, witness: &Self::Witness) -> Self;
 
     fn advance_one_round(&mut self);
     fn transcript(&self) -> Transcript<Self::ProverMessage, Self::VerifierMessage>;

@@ -26,9 +26,9 @@ impl ProtocolState for SchnorrState {
     type ProverMessage = F;
     type VerifierMessage = F;
 
-    fn new(instance: (), witness: F) -> SchnorrState {
+    fn new(instance: &(), witness: &F) -> SchnorrState {
         SchnorrState {
-            x: witness,
+            x: witness.clone(),
             r: F::from(0),
             c: F::from(0),
             z: F::from(0),
@@ -68,9 +68,9 @@ impl ProtocolState for SchnorrState {
 
     fn is_aborted(&self) -> bool {
         // TODO
-        OsRng.next_u32() % 100000 != 0
+        //OsRng.next_u32() % 100000 != 0
         // Schnorr prover never fails.
-        //false
+        false
     }
 
     fn is_complete(&self) -> bool {
@@ -123,10 +123,9 @@ mod tests {
 
     #[test]
     fn foo() {
-        let mut rng = test_rng();
-        let x = F::rand(&mut rng);
+        let x = F::rand(&mut OsRng);
 
-        let root = SchnorrState::new((), x);
+        let root = SchnorrState::new(&(), &x);
 
         let tree = generate_tree::<SchnorrState, SchnorrExtractor>(root, 0);
 
