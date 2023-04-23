@@ -1,3 +1,6 @@
+use std::f32::consts::E;
+use std::ops;
+
 use rand_core::{RngCore, OsRng};
 use nova_snark::r1cs::{
     RelaxedR1CSWitness, RelaxedR1CSInstance, R1CSWitness, R1CSInstance,
@@ -105,8 +108,6 @@ impl<G: Clone + Group> ProtocolState for FoldingState<G> {
             // Verifier checks the folded witness satisfies the folded instance
             if !self.instance.shape.is_sat_relaxed(&self.instance.ck, &u, &w).is_ok() {
                 panic!("folded witness no satisfy");
-            } else {
-                println!("It is working!");
             }
         } else {
             panic!("Not that many rounds!");
@@ -134,43 +135,160 @@ impl<G: Clone + Group> ProtocolState for FoldingState<G> {
 
 }
 
+#[derive(Clone)]
+struct ScalarVec<G: Group> {
+    v: Vec<<G as Group>::Scalar>
+}
+
+impl<G: Group> ops::Add<ScalarVec<G>> for ScalarVec<G> {
+    type Output = ScalarVec<G>;
+
+    fn add(self, _rhs: ScalarVec<G>) -> ScalarVec<G> {
+        assert!(self.v.len() == _rhs.v.len());
+
+        let mut output = vec![<G as Group>::Scalar::zero(); self.v.len()];
+        for i in 0..self.v.len() {
+            output[i] = self.v[i] + _rhs.v[i];
+        }
+
+        ScalarVec{ v: output }
+    }
+}
+
+impl<G: Group> ops::Sub<ScalarVec<G>> for ScalarVec<G> {
+    type Output = Self;
+
+    fn sub(self, _rhs: Self) -> Self {
+        assert!(self.v.len() == _rhs.v.len());
+
+        let mut output = vec![<G as Group>::Scalar::zero(); self.v.len()];
+        for i in 0..self.v.len() {
+            output[i] = self.v[i] - _rhs.v[i];
+        }
+
+        Self { v: output }
+    }
+}
+
+impl<G: Group> ops::Mul<<G as Group>::Scalar> for ScalarVec<G> {
+    type Output = Self;
+
+    fn mul(self, _rhs: <G as Group>::Scalar) -> Self {
+        let mut output = vec![<G as Group>::Scalar::zero(); self.v.len()];
+        for i in 0..self.v.len() {
+            output[i] = self.v[i] * _rhs;
+        }
+
+        Self { v: output }
+    }
+}
+
+// impl<G: Group> ops::Mul<ScalarVec<G>> for <G as Group>::Scalar {
+//     type Output = ScalarVec<G>;
+// 
+//     fn mul(self, _rhs: <G as Group>::Scalar) -> Self {
+// 
+//         let mut output = vec![<G as Group>::Scalar::zero(); _rhs.v.len()];
+//         for i in 0..self.v.len() {
+//             output[i] = self * _rhs.v[i];
+//         }
+// 
+//         ScalarVec<G> { v: output }
+//     }
+// 
+// }
+
 impl<G: Clone + Group> Extractor<FoldingState<G>> for FoldingExtractor {
     fn extract(root: TranscriptTreeNode<<FoldingState<G> as ProtocolState>::ProverMessage, <FoldingState<G> as ProtocolState>::VerifierMessage>) -> <FoldingState<G> as ProtocolState>::Witness {
         assert!(root.children.len() == 1);
         assert!(root.children[0].children.len() == 3);
 
-        let W = vec![
+        let W: Vec<ScalarVec<G>> = vec![
             match &root.children[0].children[0].transcript.prover_messages[1] { 
-                FoldingProverMessage::R2 { folded_witness: fw } => fw.W.clone(),
+                FoldingProverMessage::R2 { folded_witness: fw } => ScalarVec { v: fw.W.clone() },
                 _ => panic!()
             },
             match &root.children[0].children[1].transcript.prover_messages[1] { 
-                FoldingProverMessage::R2 { folded_witness: fw } => fw.W.clone(),
+                FoldingProverMessage::R2 { folded_witness: fw } => ScalarVec { v: fw.W.clone() },
                 _ => panic!()
             },
             match &root.children[0].children[2].transcript.prover_messages[1] { 
-                FoldingProverMessage::R2 { folded_witness: fw } => fw.W.clone(),
+                FoldingProverMessage::R2 { folded_witness: fw } => ScalarVec { v: fw.W.clone() },
                 _ => panic!()
             }
         ];
 
-        let E = vec![
+        let EE: Vec<ScalarVec<G>> = vec![
             match &root.children[0].children[0].transcript.prover_messages[1] { 
-                FoldingProverMessage::R2 { folded_witness: fw } => fw.E.clone(),
+                FoldingProverMessage::R2 { folded_witness: fw } => ScalarVec { v: fw.E.clone() },
                 _ => panic!()
             },
             match &root.children[0].children[1].transcript.prover_messages[1] { 
-                FoldingProverMessage::R2 { folded_witness: fw } => fw.E.clone(),
+                FoldingProverMessage::R2 { folded_witness: fw } => ScalarVec { v: fw.E.clone() },
                 _ => panic!()
             },
             match &root.children[0].children[2].transcript.prover_messages[1] { 
-                FoldingProverMessage::R2 { folded_witness: fw } => fw.E.clone(),
+                FoldingProverMessage::R2 { folded_witness: fw } => ScalarVec { v: fw.E.clone() },
                 _ => panic!()
             }
         ];
 
+        let r = vec![
+            match &root.children[0].children[0].transcript.verifier_messages[0] { 
+                FoldingVerifierMessage::R2 { r } => r.clone(),
+                _ => panic!()
+            },
+            match &root.children[0].children[1].transcript.verifier_messages[0] { 
+                FoldingVerifierMessage::R2 { r } => r.clone(),
+                _ => panic!()
+            },
+            match &root.children[0].children[2].transcript.verifier_messages[0] { 
+                FoldingVerifierMessage::R2 { r } => r.clone(),
+                _ => panic!()
+            },
+        ];
 
-        unimplemented!()
+        let len_w = W[0].v.len();
+        assert!(W[1].v.len() == len_w);
+        assert!(W[2].v.len() == len_w);
+
+        // let W2 = (W[1].clone() - W[0].clone()) * (r[1] - r[0]);
+        // let W1 = W[0].clone() - W2.clone() * r[0];
+        let W1 = (W[1].clone() * r[0] - W[0].clone() * r[1]) * (r[0] - r[1]).invert().unwrap();
+        let W2 = (W[0].clone() - W[1].clone()) * (r[0] - r[1]).invert().unwrap();
+
+        let qinv = ((r[0] - r[1]) * (r[0] - r[1]) * (r[1] - r[2])).invert().unwrap();
+
+        let E1 = (
+            EE[0].clone() * r[1] * r[2] * (r[1] - r[2]) +
+            EE[1].clone() * r[0] * r[2] * (r[2] - r[0]) + 
+            EE[2].clone() * r[0] * r[1] * (r[0] - r[1])
+        ) * qinv;
+
+        let E2 = (
+            EE[0].clone() * (r[1] - r[2]) + EE[1].clone() * (r[2] - r[0]) + EE[2].clone() * (r[0] - r[1])
+        ) * qinv;
+
+        // Check that E is 0 in W2 (it's a strict R1CS instance)
+        for i in 0..E2.v.len() {
+            assert_eq!(E2.v[i], <G as Group>::Scalar::zero());
+        }
+
+        // TEMPORARY: same should be true of E1 since our example folds two strict relaxed instances
+        for i in 0..E1.v.len() {
+            assert_eq!(E1.v[i], <G as Group>::Scalar::zero());
+        }
+
+        FoldingWitness::<G> {
+            w1: RelaxedR1CSWitness::<G> {
+                W: W1.v,
+                E: E1.v,
+            },
+            w2: R1CSWitness::<G> {
+                W: W2.v,
+            }
+        }
+
     }
 
     fn required_arity(level: usize) -> usize {
@@ -248,8 +366,8 @@ mod tests {
         let u1r = RelaxedR1CSInstance::from_r1cs_instance(&ck, &shape, &u1);
         let w1r = RelaxedR1CSWitness::from_r1cs_witness(&shape, &w1);
 
-        let instance = FoldingInstance::<G2> { ck, shape, u1: u1r, u2 };
-        let witness = FoldingWitness::<G2> { w1: w1r, w2 };
+        let instance = FoldingInstance::<G2> { ck: ck.clone(), shape: shape.clone(), u1: u1r.clone(), u2: u2.clone() };
+        let witness = FoldingWitness::<G2> { w1: w1r.clone(), w2: w2.clone() };
 
         let root = FoldingState::<G2>::new(&instance, &witness);
 
@@ -259,7 +377,10 @@ mod tests {
         assert_eq!(extracted_witness.w1, witness.w1);
         assert_eq!(extracted_witness.w2, witness.w2);
 
-        // --------
+        //println!("Nova error: {:?}", shape.is_sat(&ck, &u1, &R1CSWitness::<G2> { W: extracted_witness.w1.W}));
+        assert!(shape.is_sat(&ck, &u2, &extracted_witness.w2).is_ok());
+        assert!(shape.is_sat(&ck, &u1, &R1CSWitness::<G2> { W: extracted_witness.w1.W}).is_ok());
+
 
         // Then the satisfying assignment
 
