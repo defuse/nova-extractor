@@ -105,6 +105,8 @@ impl<G: Clone + Group> ProtocolState for FoldingState<G> {
             // Verifier checks the folded witness satisfies the folded instance
             if !self.instance.shape.is_sat_relaxed(&self.instance.ck, &u, &w).is_ok() {
                 panic!("folded witness no satisfy");
+            } else {
+                println!("It is working!");
             }
         } else {
             panic!("Not that many rounds!");
@@ -134,6 +136,40 @@ impl<G: Clone + Group> ProtocolState for FoldingState<G> {
 
 impl<G: Clone + Group> Extractor<FoldingState<G>> for FoldingExtractor {
     fn extract(root: TranscriptTreeNode<<FoldingState<G> as ProtocolState>::ProverMessage, <FoldingState<G> as ProtocolState>::VerifierMessage>) -> <FoldingState<G> as ProtocolState>::Witness {
+        assert!(root.children.len() == 1);
+        assert!(root.children[0].children.len() == 3);
+
+        let W = vec![
+            match &root.children[0].children[0].transcript.prover_messages[1] { 
+                FoldingProverMessage::R2 { folded_witness: fw } => fw.W.clone(),
+                _ => panic!()
+            },
+            match &root.children[0].children[1].transcript.prover_messages[1] { 
+                FoldingProverMessage::R2 { folded_witness: fw } => fw.W.clone(),
+                _ => panic!()
+            },
+            match &root.children[0].children[2].transcript.prover_messages[1] { 
+                FoldingProverMessage::R2 { folded_witness: fw } => fw.W.clone(),
+                _ => panic!()
+            }
+        ];
+
+        let E = vec![
+            match &root.children[0].children[0].transcript.prover_messages[1] { 
+                FoldingProverMessage::R2 { folded_witness: fw } => fw.E.clone(),
+                _ => panic!()
+            },
+            match &root.children[0].children[1].transcript.prover_messages[1] { 
+                FoldingProverMessage::R2 { folded_witness: fw } => fw.E.clone(),
+                _ => panic!()
+            },
+            match &root.children[0].children[2].transcript.prover_messages[1] { 
+                FoldingProverMessage::R2 { folded_witness: fw } => fw.E.clone(),
+                _ => panic!()
+            }
+        ];
+
+
         unimplemented!()
     }
 
