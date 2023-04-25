@@ -252,8 +252,6 @@ impl<G: Clone + Group> Extractor<FoldingState<G>> for FoldingExtractor {
         assert!(W[1].v.len() == len_w);
         assert!(W[2].v.len() == len_w);
 
-        // let W2 = (W[1].clone() - W[0].clone()) * (r[1] - r[0]);
-        // let W1 = W[0].clone() - W2.clone() * r[0];
         let W1 = (W[1].clone() * r[0] - W[0].clone() * r[1]) * (r[0] - r[1]).invert().unwrap();
         let W2 = (W[0].clone() - W[1].clone()) * (r[0] - r[1]).invert().unwrap();
 
@@ -377,13 +375,8 @@ mod tests {
         assert_eq!(extracted_witness.w1, witness.w1);
         assert_eq!(extracted_witness.w2, witness.w2);
 
-        //println!("Nova error: {:?}", shape.is_sat(&ck, &u1, &R1CSWitness::<G2> { W: extracted_witness.w1.W}));
         assert!(shape.is_sat(&ck, &u2, &extracted_witness.w2).is_ok());
         assert!(shape.is_sat(&ck, &u1, &R1CSWitness::<G2> { W: extracted_witness.w1.W}).is_ok());
 
-
-        // Then the satisfying assignment
-
-        // Make sure that this is satisfiable
     }
 }
